@@ -1,0 +1,9 @@
+# パスワード設定・元Excel・ローカルスクリプト・キャッシュはGitHubへ公開しない
+パスワード設定.txt
+docs/
+データ/
+スクリプト/
+*.bat
+*.tmp
+__pycache__/
+.DS_Store

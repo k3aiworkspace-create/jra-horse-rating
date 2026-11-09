@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="googlebot" content="noindex, nofollow, noarchive">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>JRA レーティング ランキング＆分析システム</title>
+  <link rel="stylesheet" href="スタイル.css">
+</head>
+<body>
+  <!-- パスワード認証ロック画面 -->
+  <div class="auth-overlay" id="authScreen">
+    <div class="auth-card">
+      <div class="auth-icon">🔒</div>
+      <h2>限定公開ページ</h2>
+      <p class="auth-desc">閲覧するには合言葉（パスワード）を入力してください。</p>
+      <form id="authForm">
+        <input type="password" id="authPasswordInput" class="auth-input" placeholder="パスワードを入力..." autocomplete="current-password" required>
+        <label class="auth-remember">
+          <input type="checkbox" id="authRememberCheck" checked>
+          <span>次回からこのブラウザで入力を省略する</span>
+        </label>
+        <div class="auth-error hidden" id="authErrorMsg">パスワードが正しくありません。</div>
+        <button type="submit" class="btn-auth-submit" id="btnAuthSubmit">🔓 ロック解除して表示</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- アプリ本体（認証完了まで非表示） -->
+  <div id="appRoot" class="hidden">
+    <!-- ヘッダー -->
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="brand-icon">🏇</span>
+          <div>
+            <h1>JRA レーティング ランキング</h1>
+            <p class="subtitle" id="headerSubtitle">2017年〜2026年 全データ搭載（PC・スマホ対応）</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="btn btn-outline" id="btnToggleFilterMobile">
+            🔍 条件フィルタ <span id="activeFilterBadge" class="badge hidden">0</span>
+          </button>
+          <button type="button" class="btn btn-secondary" id="btnExportCsv" title="現在の表示ランキングをCSV出力">
+            📥 CSV出力
+          </button>
+          <button type="button" class="btn btn-outline" id="btnLockApp" title="パスワードロック画面に戻す">
+            🔒 ロック
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-container">
+      <!-- クイックプリセットバー -->
+      <section class="preset-bar" aria-label="クイックランキング切り替え">
+        <div class="preset-scroll">
+          <button type="button" class="preset-chip active" data-preset="all">🏆 歴代総合TOP</button>
+          <button type="button" class="preset-chip" data-preset="active_jra">🟢 現役馬(中央)TOP</button>
+          <button type="button" class="preset-chip" data-preset="gen_2023">✨ 現3歳世代(23年産)</button>
+          <button type="button" class="preset-chip" data-preset="gen_2022">🔥 現4歳世代(22年産)</button>
+          <button type="button" class="preset-chip" data-preset="gen_2021">👑 現5歳世代(21年産)</button>
+          <button type="button" class="preset-chip" data-preset="gen_2024">🌱 現2歳世代(24年産)</button>
+          <button type="button" class="preset-chip" data-preset="active_sprint">⚡ 現役スプリント(S)</button>
+          <button type="button" class="preset-chip" data-preset="active_mile">💎 現役マイル(M)</button>
+          <button type="button" class="preset-chip" data-preset="active_middle">⚔️ 現役中長距離(I/L/E)</button>
+          <button type="button" class="preset-chip" data-preset="active_dirt">🏜️ 現役ダートTOP</button>
+          <button type="button" class="preset-chip" data-preset="active_mare">🌸 現役牝馬TOP</button>
+          <button type="button" class="preset-chip" data-preset="year_2026">📅 2026年ベスト</button>
+          <button type="button" class="preset-chip" data-preset="age_2yo">🐣 歴代2歳時ベスト</button>
+          <button type="button" class="preset-chip" data-preset="age_3yo">🎖️ 歴代3歳時ベスト</button>
+        </div>
+      </section>
+
+      <!-- フィルタパネル -->
+      <section class="filter-panel" id="filterPanel">
+        <div class="filter-header">
+          <h2>🔍 絞り込み・集計条件</h2>
+          <div class="filter-header-btns">
+            <button type="button" class="btn-text" id="btnResetFilters">条件をリセット</button>
+          </div>
+        </div>
+
+        <div class="filter-grid">
+          <!-- キーワード検索 -->
+          <div class="filter-group filter-group-wide">
+            <label for="fSearch">馬名・レース名・血統検索</label>
+            <input type="search" id="fSearch" placeholder="例: イクイノックス、有馬記念、キズナ..." autocomplete="off">
+          </div>
+
+          <!-- 現役ステータス -->
+          <div class="filter-group">
+            <label for="fStatus">現役 / 引退区分</label>
+            <select id="fStatus">
+              <option value="all">すべて（現役＋引退）</option>
+              <option value="active_jra">現役（JRA所属）のみ</option>
+              <option value="active_all">現役（JRA＋地方）</option>
+              <option value="active_nar">現役（地方所属）のみ</option>
+              <option value="retired">引退（抹消）のみ</option>
+            </select>
+          </div>
+
+          <!-- 世代（生年） -->
+          <div class="filter-group">
+            <label for="fBirthYear">世代（生年）</label>
+            <select id="fBirthYear">
+              <option value="all">全世代</option>
+            </select>
+          </div>
+
+          <!-- 出走時年齢 -->
+          <div class="filter-group">
+            <label for="fRunAge">出走時年齢</label>
+            <select id="fRunAge">
+              <option value="all">全年齢</option>
+              <option value="2">2歳時のみ</option>
+              <option value="3">3歳時のみ</option>
+              <option value="3_under">3歳以下（2〜3歳）</option>
+              <option value="4_over">4歳以上（古馬）</option>
+              <option value="4">4歳時のみ</option>
+              <option value="5">5歳時のみ</option>
+              <option value="6_over">6歳以上</option>
+            </select>
+          </div>
+
+          <!-- 芝・ダート -->
+          <div class="filter-group">
+            <label for="fSurface">芝・ダート</label>
+            <select id="fSurface">
+              <option value="all">芝・ダートすべて</option>
+              <option value="芝">芝のみ</option>
+              <option value="ダート">ダートのみ</option>
+            </select>
+          </div>
+
+          <!-- 距離区分 (SMILE) -->
+          <div class="filter-group">
+            <label for="fCategory">距離区分 (SMILE)</label>
+            <select id="fCategory">
+              <option value="all">全距離区分 (S/M/I/L/E)</option>
+              <option value="S">S：スプリント (〜1300m)</option>
+              <option value="M">M：マイル (1301〜1899m)</option>
+              <option value="I">I：インターミディエイト (1900〜2100m)</option>
+              <option value="L">L：ロング (2101〜2700m)</option>
+              <option value="E">E：エクステンデッド (2701m〜)</option>
+              <option value="ILE">中長距離まとめ (I・L・E / 1900m〜)</option>
+              <option value="SM">短距離・マイルまとめ (S・M / 〜1899m)</option>
+            </select>
+          </div>
+
+          <!-- 実距離 (m) -->
+          <div class="filter-group">
+            <label for="fDistance">実距離 (m)</label>
+            <select id="fDistance">
+              <option value="all">全距離</option>
+            </select>
+          </div>
+
+          <!-- 性別 -->
+          <div class="filter-group">
+            <label for="fSex">性別</label>
+            <select id="fSex">
+              <option value="all">全性別（牡・牝・セ）</option>
+              <option value="male_gelding">牡・セン馬</option>
+              <option value="牡">牡馬のみ</option>
+              <option value="牝">牝馬のみ</option>
+              <option value="セ">セン馬のみ</option>
+            </select>
+          </div>
+
+          <!-- グレード -->
+          <div class="filter-group">
+            <label for="fGrade">グレード</label>
+            <select id="fGrade">
+              <option value="all">全グレード</option>
+              <option value="G1">GⅠ（JpnⅠ含む）のみ</option>
+              <option value="G1_G2">GⅠ・GⅡ</option>
+              <option value="graded">重賞（GⅠ〜GⅢ）</option>
+              <option value="non_graded">リステッド(L)・オープン特別</option>
+            </select>
+          </div>
+
+          <!-- 開催年（期間） -->
+          <div class="filter-group">
+            <label for="fYearFrom">実施年（開始〜終了）</label>
+            <div class="range-inputs">
+              <select id="fYearFrom"></select>
+              <span>〜</span>
+              <select id="fYearTo"></select>
+            </div>
+          </div>
+
+          <!-- 着順 -->
+          <div class="filter-group">
+            <label for="fRank">着順条件</label>
+            <select id="fRank">
+              <option value="all">全着順</option>
+              <option value="1">1着（勝ち馬）のみ</option>
+              <option value="2_under">2着以内（連対馬）</option>
+              <option value="3_under">3着以内（馬券圏内）</option>
+              <option value="2_over">2着以下（敗戦時ベスト）</option>
+            </select>
+          </div>
+
+          <!-- 競馬場 -->
+          <div class="filter-group">
+            <label for="fVenue">実施場</label>
+            <select id="fVenue">
+              <option value="all">全10場</option>
+              <option value="東京">東京</option>
+              <option value="中山">中山</option>
+              <option value="京都">京都</option>
+              <option value="阪神">阪神</option>
+              <option value="中京">中京</option>
+              <option value="新潟">新潟</option>
+              <option value="札幌">札幌</option>
+              <option value="函館">函館</option>
+              <option value="福島">福島</option>
+              <option value="小倉">小倉</option>
+            </select>
+          </div>
+
+          <!-- 評価基準 -->
+          <div class="filter-group">
+            <label for="fRatingSource">ランキング評価値</label>
+            <select id="fRatingSource">
+              <option value="adjusted">自分の補正優先（なければ公式R）</option>
+              <option value="official">JRA公式レーティングのみ</option>
+              <option value="only_adjusted">自分の補正入力済みのみ</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- 集計サマリーカード -->
+      <section class="summary-cards">
+        <div class="summary-card">
+          <span class="summary-label">該当ユニーク馬数</span>
+          <strong class="summary-value" id="statUniqueHorses">-</strong>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">該当延べ記録数</span>
+          <strong class="summary-value" id="statTotalRecords">-</strong>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">条件内最高R</span>
+          <strong class="summary-value highlight" id="statMaxRating">-</strong>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">上位10頭平均R</span>
+          <strong class="summary-value" id="statTop10Avg">-</strong>
+        </div>
+      </section>
+
+      <!-- 表示モード切り替えタブ -->
+      <section class="mode-tabs-bar">
+        <div class="mode-tabs" role="tablist">
+          <button type="button" class="mode-tab active" data-mode="horse" role="tab">
+            🐎 馬別ランキング <small>(1頭1行・最高R)</small>
+          </button>
+          <button type="button" class="mode-tab" data-mode="record" role="tab">
+            📋 延べ記録ランキング <small>(全レース記録)</small>
+          </button>
+          <button type="button" class="mode-tab" data-mode="race" role="tab">
+            🏟️ レース別(R・R)ランキング
+          </button>
+        </div>
+        <div class="pagination-controls">
+          <label for="pageSizeSelect">表示件数:</label>
+          <select id="pageSizeSelect">
+            <option value="50">50件</option>
+            <option value="100" selected>100件</option>
+            <option value="250">250件</option>
+            <option value="500">500件</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- ランキングテーブル表示領域 -->
+      <section class="ranking-section">
+        <div class="table-responsive">
+          <table class="ranking-table" id="rankingTable">
+            <thead id="rankingThead"></thead>
+            <tbody id="rankingTbody"></tbody>
+          </table>
+        </div>
+        <div class="pager-bar" id="pagerBar"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 馬詳細モーダル -->
+  <div class="modal-backdrop hidden" id="horseModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div id="horseModalTitleArea"></div>
+        <button type="button" class="modal-close" id="btnCloseHorseModal" aria-label="閉じる">✕</button>
+      </div>
+      <div class="modal-body" id="horseModalBody"></div>
+    </div>
+  </div>
+
+  <!-- レース詳細モーダル -->
+  <div class="modal-backdrop hidden" id="raceModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div id="raceModalTitleArea"></div>
+        <button type="button" class="modal-close" id="btnCloseRaceModal" aria-label="閉じる">✕</button>
+      </div>
+      <div class="modal-body" id="raceModalBody"></div>
+    </div>
+  </div>
+
+  <script src="データ.js"></script>
+  <script src="アプリ.js"></script>
+</body>
+</html>
